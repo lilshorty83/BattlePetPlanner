@@ -1,0 +1,31 @@
+## Interface: 110105
+## Title: BattlePetPlanner
+## Notes: Plan routes to hunt missing battle pets
+## Author: You
+## Version: 1.0.0
+## SavedVariables: BattlePetPlannerDB
+libs\LibStub\LibStub.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+Routes/Routes_Kalimdor.lua
+Routes/Routes_Northrend.lua
+Routes/Routes_EasternKingdoms.lua
+Routes/Routes_Outland.lua
+Routes/Routes_Draenor.lua
+Routes/Routes_Pandaria.lua
+Routes/Routes_BrokenIsles.lua
+Routes/Routes_Argus.lua
+Routes/Routes_Shadowlands.lua
+Routes/Routes_DragonIsles.lua
+Routes/Routes_Zandalar.lua
+Routes/Routes_KulTiras.lua
+Routes/Routes_Nazjatar.lua
+Routes/Routes_Maelstrom.lua
+Routes/Routes_ZerethMortis.lua
+Routes/Routes_KhazAlgar.lua
+Routes/Routes_SirenIsle.lua
+WaypointLogic.lua
+MinimalScrollbar.lua
+BattlePetPlanner.lua
+
