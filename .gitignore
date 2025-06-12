@@ -1,0 +1,57 @@
+# Debug files
+DebugLog.txt
+*.log
+*.log.*
+
+# Backup files
+*.bak
+*.bak.*
+*.swp
+*.swo
+*~
+
+# WoW specific
+*.bak
+*.old
+*.orig
+*.rej
+*.swp
+*.swo
+*.swn
+*.swo
+*.swm
+*.swn
+*.swo
+*.swp
+*.un~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor directories and files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Dependency directories
+libs/
+
+# Local development files
+*.local
+.env
+*.env.*
+!.env.example
+
+# Temporary files
+tmp/
+temp/
+
+# Compiled Lua files (if you have any)
+*.luac
