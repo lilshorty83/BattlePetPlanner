@@ -16,7 +16,13 @@ function BPP_MinimalScrollbar.Attach(parent, scrollFrame, contentFrame, opts)
     upButton:SetNormalAtlas("minimal-scrollbar-small-arrow-top")
     upButton:SetPushedAtlas("minimal-scrollbar-small-arrow-top-down")
     upButton:SetHighlightAtlas("minimal-scrollbar-small-arrow-top-over")
-    upButton:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -3, -4)
+    
+    -- Apply custom up button position or use default
+    if opts.upButtonPoint then
+        upButton:SetPoint(unpack(opts.upButtonPoint))
+    else
+        upButton:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -3, -4)
+    end
 
     -- Down Button
     local downButton = CreateFrame("Button", nil, parent)
@@ -24,7 +30,13 @@ function BPP_MinimalScrollbar.Attach(parent, scrollFrame, contentFrame, opts)
     downButton:SetNormalAtlas("minimal-scrollbar-small-arrow-bottom")
     downButton:SetPushedAtlas("minimal-scrollbar-small-arrow-bottom-down")
     downButton:SetHighlightAtlas("minimal-scrollbar-small-arrow-bottom-over")
-    downButton:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -3, 4)
+    
+    -- Apply custom down button position or use default
+    if opts.downButtonPoint then
+        downButton:SetPoint(unpack(opts.downButtonPoint))
+    else
+        downButton:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -3, 4)
+    end
 
     -- ScrollBar
     local minimalScrollBar = CreateFrame("Slider", nil, parent)
@@ -33,10 +45,23 @@ function BPP_MinimalScrollbar.Attach(parent, scrollFrame, contentFrame, opts)
     minimalScrollBar:SetMinMaxValues(0, 1)
     minimalScrollBar:SetValueStep(1)
     minimalScrollBar:SetObeyStepOnDrag(true)
-    -- Align the scrollbar exactly under the up/down arrow buttons (centered)
-    minimalScrollBar:SetPoint("TOP", upButton, "BOTTOM", 0, -padding)
-    minimalScrollBar:SetPoint("BOTTOM", downButton, "TOP", 0, padding)
-    minimalScrollBar:SetPoint("CENTER", upButton, "CENTER", 0, 0)
+    
+    -- Apply custom scrollbar positioning or use default
+    if opts.scrollBarPoints then
+        for _, point in ipairs(opts.scrollBarPoints) do
+            if #point == 1 then
+                minimalScrollBar:SetPoint(point[1])
+            else
+                local relativeTo = point[2] == "upButton" and upButton or (point[2] == "downButton" and downButton or nil)
+                minimalScrollBar:SetPoint(point[1], relativeTo or point[2], point[3] or "CENTER", point[4] or 0, point[5] or 0)
+            end
+        end
+    else
+        -- Default positioning if no custom points provided
+        minimalScrollBar:SetPoint("TOP", upButton, "BOTTOM", 0, -padding)
+        minimalScrollBar:SetPoint("BOTTOM", downButton, "TOP", 0, padding)
+        minimalScrollBar:SetPoint("CENTER", upButton, "CENTER", 0, 0)
+    end
 
     -- Track
     local trackTop = minimalScrollBar:CreateTexture(nil, "BACKGROUND")

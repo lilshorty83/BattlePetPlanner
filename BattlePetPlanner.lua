@@ -120,7 +120,7 @@ local ShowRouteLeg
 -- =====================
 local gui = CreateFrame("Frame", "BattlePetPlannerFrame", UIParent, "PortraitFrameTemplate")
 gui:Hide() -- Ensure the frame is hidden on creation
-gui:SetSize(770, 606)
+gui:SetSize(775, 606)  -- Increased from 770 to 775 to expand right pane
 gui:SetPoint("CENTER")
 gui:SetFrameStrata("HIGH")
 gui:SetMovable(true)
@@ -135,7 +135,7 @@ gui:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
 local leftPane = CreateFrame("Frame", nil, gui, "InsetFrameTemplate")
 leftPane:SetPoint("TOPLEFT", gui, "TOPLEFT", 10, -100)
 leftPane:SetPoint("BOTTOMLEFT", gui, "BOTTOMLEFT", 10, 10)
-leftPane:SetWidth(230)
+leftPane:SetWidth(235)  -- Increased from 230 to create more space for scrollbar
 
 -- =====================
 -- RIGHT PANE: Route Steps / Planner
@@ -507,90 +507,185 @@ leftBg:SetTexture("interface/collections/collectionsbackgroundtile")
 leftBg:SetAllPoints(leftPane)
 leftPane.bg = leftBg
 
-    -- Attach a scrollable container to the left pane if not present
-    if not leftPane.petListContainer then
-        -- Container for pet list and scrollbar, below search box
-        local container = CreateFrame("Frame", nil, leftPane)
-        container:SetPoint("TOPLEFT", leftPane, "TOPLEFT", 6, -40)  -- Adjusted y-offset for search box
-        container:SetPoint("BOTTOMRIGHT", leftPane, "BOTTOMRIGHT", -5, 8)
-        container:SetClipsChildren(true) -- Ensures content is clipped to this area
-        leftPane.petListContainer = container
+-- Constants for pet list
+local PET_ROW_HEIGHT = 46  -- Height of each pet row in pixels
+local SCROLLBAR_WIDTH = 10  -- Width of the scrollbar
+local SCROLLBAR_PADDING = 6  -- Padding around the scrollbar
+local PET_LIST_PADDING = 3  -- Padding around the pet list
 
-        -- ScrollChild: The visible mask area
-        local scrollChild = CreateFrame("Frame", nil, container)
-        scrollChild:SetPoint("TOPLEFT", leftPane, "TOPLEFT", 0, 0)
-        scrollChild:SetPoint("BOTTOMRIGHT", leftPane, "BOTTOMRIGHT", 0, 0)
-        scrollChild:SetPoint("TOPLEFT")
-        scrollChild:SetPoint("BOTTOMRIGHT")
-        scrollChild:SetClipsChildren(true)
-        leftPane.scrollChild = scrollChild
+-- Create main container for the pet list
+local petListContainer = CreateFrame("Frame", nil, leftPane, "BackdropTemplate")
+-- Set up pet list container with standard padding
+petListContainer:SetPoint("TOPLEFT", leftPane, "TOPLEFT", PET_LIST_PADDING, -PET_LIST_PADDING)
+petListContainer:SetPoint("BOTTOMRIGHT", leftPane, "BOTTOMRIGHT", -PET_LIST_PADDING, PET_LIST_PADDING)
+petListContainer:SetClipsChildren(true)
 
-        -- Content: The actual scrollable content (pet list items)
-        local content = CreateFrame("Frame", nil, scrollChild)
-        content:SetPoint("TOPLEFT")
-        content:SetWidth(scrollChild:GetWidth()) -- Will be updated dynamically
-        leftPane.petListContent = content
+-- Create scroll child that will act as a mask
+local scrollChild = CreateFrame("Frame", nil, petListContainer, "BackdropTemplate")
+scrollChild:SetAllPoints(true)
+scrollChild:SetClipsChildren(true)
+
+-- Create content frame that will hold the pet list buttons
+local initialMissing = (BattlePetPlannerDB and type(BattlePetPlannerDB.missingPets) == "table" and BattlePetPlannerDB.missingPets) or {}
+local petListContent = CreateFrame("Frame", nil, scrollChild, "BackdropTemplate")
+petListContent:SetPoint("TOPLEFT")
+petListContent:SetWidth(petListContainer:GetWidth() - (SCROLLBAR_WIDTH + SCROLLBAR_PADDING))
+petListContent:SetHeight(math.max(200, #initialMissing * PET_ROW_HEIGHT))
+
+-- Store references for later use
+leftPane.petListContainer = petListContainer
+leftPane.scrollChild = scrollChild
+leftPane.petListContent = petListContent
+
+-- Function to update content position and handle bounds
+local function UpdatePetListPosition(offset)
+    -- Calculate max possible offset (content height - container height)
+    local contentHeight = petListContent:GetHeight() or 1
+    local containerHeight = petListContainer:GetHeight() or 1
+    local maxOffset = math.max(0, contentHeight - containerHeight)
+    
+    -- Clamp the offset to valid range
+    offset = math.max(0, math.min(offset, maxOffset))
+    
+    -- Update content position
+    petListContent:ClearAllPoints()
+    petListContent:SetPoint("TOPLEFT", 0, offset)
+    petListContent:SetPoint("TOPRIGHT", 0, offset)
+    
+    return offset
+end
+
+-- Store the function for later use
+leftPane.UpdatePetListPosition = UpdatePetListPosition
+
+-- =====================
+-- LEFT PANE: Minimal Scrollbar
+-- =====================
+local function SetupLeftPaneScrollbar()
+    local BPP_MinimalScrollbar = _G.BPP_MinimalScrollbar
+    if not BPP_MinimalScrollbar or not BPP_MinimalScrollbar.Attach then
+        print("BattlePetPlanner: BPP_MinimalScrollbar not found, scrollbar will not work")
+        return
     end
-    local content = leftPane.petListContent
-    if not content.buttons then content.buttons = {} end
-
-    -- Minimal Scrollbar integration (attach only once)
-    if not leftPane.minimalScrollBar and leftPane.petListContainer and leftPane.scrollChild and leftPane.petListContent then
-        local BPP_MinimalScrollbar = _G.BPP_MinimalScrollbar
-        if BPP_MinimalScrollbar and BPP_MinimalScrollbar.Attach then
-            local opts = {
-                width = 8,
-                arrowButtonHeight = 16,
-                padding = 4,
-                totalNumItems = 0,
-                buttonHeight = 46,
-            }
-            local minimalScrollBar = BPP_MinimalScrollbar.Attach(
-                leftPane.petListContainer,
-                leftPane.scrollChild,
-                leftPane.petListContent,
-                opts
-            )
-            leftPane.minimalScrollBar = minimalScrollBar
-            minimalScrollBar:Show()
-
-            -- Helper to update range and thumb
-            local function RefreshPetListScrollbar()
-                local pets = BattlePetPlannerDB and BattlePetPlannerDB.allPets or {}
-                local numPets = #pets
-                minimalScrollBar.totalNumItems = numPets  -- Update the scrollbar's total items
-                local visibleRows = math.floor((leftPane.scrollChild:GetHeight() or 1) / 46)
-                local maxScroll = math.max(0, numPets - visibleRows)
-                minimalScrollBar:SetMinMaxValues(0, maxScroll)
-                if minimalScrollBar:GetValue() > maxScroll then
-                    minimalScrollBar:SetValue(maxScroll)
-                end
+    
+    -- Create the scrollbar with options
+    local opts = {
+        width = SCROLLBAR_WIDTH,
+        arrowButtonHeight = 16,
+        padding = SCROLLBAR_PADDING,
+        buttonHeight = PET_ROW_HEIGHT,
+        -- Custom positioning for left pane scrollbar (moved 1px right)
+        upButtonPoint = { "TOPRIGHT", petListContainer, "TOPRIGHT", -2, -4 },
+        downButtonPoint = { "BOTTOMRIGHT", petListContainer, "BOTTOMRIGHT", -2, 4 },
+        -- Scrollbar points (relative to upButton/downButton)
+        scrollBarPoints = {
+            { "TOP", "upButton", "BOTTOM", 0, -SCROLLBAR_PADDING },
+            { "BOTTOM", "downButton", "TOP", 0, SCROLLBAR_PADDING },
+            { "CENTER", "upButton", "CENTER", 0, 0 }
+        }
+    }
+    
+    -- Attach the scrollbar to the container
+    local scrollbar = BPP_MinimalScrollbar.Attach(
+        petListContainer,
+        petListContainer,
+        petListContent,
+        opts
+    )
+    
+    -- Store reference to the scrollbar
+    leftPane.scrollbar = scrollbar
+    
+    -- Set up scrollbar value changed handler
+    scrollbar:SetScript("OnValueChanged", function(self, value)
+        local offset = -math.floor(value * PET_ROW_HEIGHT)
+        petListContent:ClearAllPoints()
+        petListContent:SetPoint("TOPLEFT", 0, offset)
+        petListContent:SetPoint("TOPRIGHT", 0, offset)
+    end)
+    
+    -- Helper to update scrollbar range and thumb
+    local function RefreshPetListScrollbar()
+        -- Get the current pet list
+        local allPets = BattlePetPlannerDB and BattlePetPlannerDB.allPets or {}
+        if type(allPets) ~= "table" then allPets = {} end
+        
+        -- Filter pets based on search text if needed
+        local displayPets = {}
+        local searchText = leftPane.searchBox and leftPane.searchBox:GetText():lower() or ""
+        
+        for _, pet in ipairs(allPets) do
+            if searchText == "" or (pet.name and pet.name:lower():find(searchText, 1, true)) then
+                table.insert(displayPets, pet)
             end
-
-            leftPane.scrollChild:HookScript("OnShow", RefreshPetListScrollbar)
-            leftPane.scrollChild:HookScript("OnSizeChanged", RefreshPetListScrollbar)
-            leftPane.petListContent:HookScript("OnSizeChanged", RefreshPetListScrollbar)
-
-            -- Move content on scroll
-            minimalScrollBar:SetScript("OnValueChanged", function(self, value)
-                leftPane.petListContent:ClearAllPoints()
-                leftPane.petListContent:SetPoint("TOPLEFT", leftPane.scrollChild, "TOPLEFT", 0, value * 46)
-            end)
-            leftPane.petListContainer:EnableMouseWheel(true)
-            leftPane.petListContainer:SetScript("OnMouseWheel", function(self, delta)
-    local min, max = minimalScrollBar:GetMinMaxValues()
-    local newVal = minimalScrollBar:GetValue() - delta
-    if newVal < min then newVal = min end
-    if newVal > max then newVal = max end
-    minimalScrollBar:SetValue(newVal)
-end)
-            -- Initial update
-            RefreshPetListScrollbar()
-            minimalScrollBar:SetValue(0)
+        end
+        
+        local numPets = #displayPets
+        local containerHeight = petListContainer:GetHeight() or 1
+        local visibleRows = math.floor(containerHeight / PET_ROW_HEIGHT)
+        local maxScroll = math.max(0, numPets - visibleRows)
+        
+        -- Update scrollbar range
+        scrollbar:SetMinMaxValues(0, maxScroll)
+        
+        -- Update content height to match number of pets
+        petListContent:SetHeight(numPets * PET_ROW_HEIGHT)
+        
+        -- Update scrollbar visibility and position
+        if maxScroll > 0 then
+            scrollbar:Show()
+            
+            -- Update thumb size based on visible content ratio
+            local thumbHeight = math.max(20, (visibleRows / numPets) * (containerHeight - 32))  -- 32 = 2 * (arrowButtonHeight + padding)
+            local thumb = scrollbar.thumb
+            if thumb then
+                thumb:SetHeight(thumbHeight)
+                -- Force update of thumb position
+                local value = scrollbar:GetValue()
+                scrollbar:SetValue(value)
+            end
+        else
+            scrollbar:SetValue(0)
+            scrollbar:Hide()
         end
     end
-
     
+    -- Set up scrollbar value changed handler
+    scrollbar:SetScript("OnValueChanged", function(self, value)
+        UpdatePetListPosition(value * PET_ROW_HEIGHT)
+    end)
+    
+    -- Enable mouse wheel scrolling on the container
+    petListContainer:EnableMouseWheel(true)
+    petListContainer:SetScript("OnMouseWheel", function(self, delta)
+        local min, max = scrollbar:GetMinMaxValues()
+        local newVal = scrollbar:GetValue() - delta  -- Subtract delta to match right pane behavior
+        if newVal < min then newVal = min end
+        if newVal > max then newVal = max end
+        scrollbar:SetValue(newVal)
+    end)
+    
+    -- Hook up events for scrollbar updates
+    petListContent:SetScript("OnSizeChanged", RefreshPetListScrollbar)
+    petListContainer:SetScript("OnSizeChanged", RefreshPetListScrollbar)
+    
+    -- Update scrollbar when pet list changes
+    hooksecurefunc("BattlePetPlanner_UpdatePetListGUI", RefreshPetListScrollbar)
+    
+    -- Initial update after a short delay to ensure frames are properly sized
+    C_Timer.After(0.1, function()
+        -- Force update container size
+        petListContainer:GetHeight()
+        RefreshPetListScrollbar()
+    end)
+    
+    -- Initial position update
+    UpdatePetListPosition(0)
+end
+
+-- Initialize the scrollbar
+C_Timer.After(0, SetupLeftPaneScrollbar)
+
 -- =====================
 -- RIGHT PANE: Route Steps / Planner
 -- =====================
@@ -988,6 +1083,7 @@ end)
         end)
         rightPane.showCollectedCheckbox = cb
     else
+        -- Update existing checkbox state and tab reference
         rightPane.showCollectedCheckbox.currentTab = idx
         rightPane.showCollectedCheckbox:SetChecked(BattlePetPlannerDB.showCollectedRoutes[idx] or false)
         rightPane.showCollectedCheckbox:Show()
@@ -1013,6 +1109,7 @@ end)
         end)
         rightPane.plotAllWaypointsCheckbox = cb2
     else
+        -- Update existing checkbox state and tab reference
         rightPane.plotAllWaypointsCheckbox.currentTab = idx
         rightPane.plotAllWaypointsCheckbox:SetChecked(BattlePetPlannerDB.plotAllWaypoints[idx] or false)
         rightPane.plotAllWaypointsCheckbox:Show()
@@ -1398,9 +1495,9 @@ function BattlePetPlanner_UpdatePetListGUI()
             btn.selectOverlay:SetAtlas("PetList-ButtonHighlight")
             btn.selectOverlay:Hide()
             -- Icon
-            btn.icon = btn:CreateTexture(nil, "ARTWORK")
+            btn.icon = btn:CreateTexture(nil, "OVERLAY")
             btn.icon:SetSize(22, 22)
-            btn.icon:SetPoint("LEFT", btn, "LEFT", 2, 0)
+            btn.icon:SetPoint("LEFT", btn, "LEFT", 4, 0)
             -- Name
             btn.name = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             btn.name:SetPoint("LEFT", btn.icon, "RIGHT", 6, 0)
@@ -1408,7 +1505,7 @@ function BattlePetPlanner_UpdatePetListGUI()
             btn.name:SetJustifyH("LEFT")
             btn.name:SetWordWrap(true)
             -- Pet type icon
-            btn.petTypeIcon = btn:CreateTexture(nil, "ARTWORK")
+            btn.petTypeIcon = btn:CreateTexture(nil, "OVERLAY")
             btn.petTypeIcon:SetSize(22, 22)
             btn.petTypeIcon:SetPoint("RIGHT", btn, "RIGHT", -2, 0)
             content.buttonPool[i] = btn
