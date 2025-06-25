@@ -5,7 +5,6 @@ local BPP_MinimalScrollbar = {}
 function BPP_MinimalScrollbar.Attach(parent, scrollFrame, contentFrame, opts)
     opts = opts or {}
     local width = opts.width or 10
-    local skinnyWidth = opts.skinnyWidth or 4
     local arrowButtonHeight = opts.arrowButtonHeight or 10
     local padding = opts.padding or 6
     local totalNumItems = opts.totalNumItems
@@ -42,14 +41,12 @@ function BPP_MinimalScrollbar.Attach(parent, scrollFrame, contentFrame, opts)
     -- Track
     local trackTop = minimalScrollBar:CreateTexture(nil, "BACKGROUND")
     trackTop:SetAtlas("minimal-scrollbar-track-top")
-    trackTop:SetWidth(skinnyWidth)
     trackTop:SetPoint("TOPLEFT", minimalScrollBar, "TOPLEFT", 1, 0)
     trackTop:SetPoint("TOPRIGHT", minimalScrollBar, "TOPRIGHT", -1, 0)
     trackTop:SetHeight(8)
 
     local trackMiddle = minimalScrollBar:CreateTexture(nil, "BACKGROUND")
     trackMiddle:SetAtlas("!minimal-scrollbar-track-middle")
-    trackMiddle:SetWidth(skinnyWidth)
     trackMiddle:SetPoint("TOPLEFT", trackTop, "BOTTOMLEFT", 0, 0)
     trackMiddle:SetPoint("TOPRIGHT", trackTop, "BOTTOMRIGHT", 0, 0)
     trackMiddle:SetPoint("BOTTOMLEFT", minimalScrollBar, "BOTTOMLEFT", 1, 8)
@@ -58,7 +55,6 @@ function BPP_MinimalScrollbar.Attach(parent, scrollFrame, contentFrame, opts)
 
     local trackBottom = minimalScrollBar:CreateTexture(nil, "BACKGROUND")
     trackBottom:SetAtlas("minimal-scrollbar-track-bottom")
-    trackBottom:SetWidth(skinnyWidth)
     trackBottom:SetPoint("BOTTOMLEFT", minimalScrollBar, "BOTTOMLEFT", 1, 0)
     trackBottom:SetPoint("BOTTOMRIGHT", minimalScrollBar, "BOTTOMRIGHT", -1, 0)
     trackBottom:SetHeight(8)

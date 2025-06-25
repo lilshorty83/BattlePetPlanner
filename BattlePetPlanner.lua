@@ -507,217 +507,90 @@ leftBg:SetTexture("interface/collections/collectionsbackgroundtile")
 leftBg:SetAllPoints(leftPane)
 leftPane.bg = leftBg
 
--- Constants for pet list
-local PET_ROW_HEIGHT = 46  -- Height of each pet row in pixels
-local SCROLLBAR_WIDTH = 10  -- Width of the scrollbar
-local SCROLLBAR_PADDING = 6  -- Padding around the scrollbar
-local PET_LIST_PADDING = 3  -- Padding around the pet list
+    -- Attach a scrollable container to the left pane if not present
+    if not leftPane.petListContainer then
+        -- Container for pet list and scrollbar, below search box
+        local container = CreateFrame("Frame", nil, leftPane)
+        container:SetPoint("TOPLEFT", leftPane, "TOPLEFT", 6, -40)  -- Adjusted y-offset for search box
+        container:SetPoint("BOTTOMRIGHT", leftPane, "BOTTOMRIGHT", -5, 8)
+        container:SetClipsChildren(true) -- Ensures content is clipped to this area
+        leftPane.petListContainer = container
 
--- Create main container for the pet list (this is the visible area)
-local petListContainer = CreateFrame("Frame", nil, leftPane, "BackdropTemplate")
-petListContainer:SetPoint("TOPLEFT", leftPane, "TOPLEFT", PET_LIST_PADDING, -PET_LIST_PADDING)
-petListContainer:SetPoint("BOTTOMRIGHT", leftPane, "BOTTOMRIGHT", -PET_LIST_PADDING, PET_LIST_PADDING)
-petListContainer:SetClipsChildren(true)
+        -- ScrollChild: The visible mask area
+        local scrollChild = CreateFrame("Frame", nil, container)
+        scrollChild:SetPoint("TOPLEFT", leftPane, "TOPLEFT", 0, 0)
+        scrollChild:SetPoint("BOTTOMRIGHT", leftPane, "BOTTOMRIGHT", 0, 0)
+        scrollChild:SetPoint("TOPLEFT")
+        scrollChild:SetPoint("BOTTOMRIGHT")
+        scrollChild:SetClipsChildren(true)
+        leftPane.scrollChild = scrollChild
 
--- Create scroll child that will contain the content
-local scrollChild = CreateFrame("Frame", nil, petListContainer, "BackdropTemplate")
-scrollChild:SetPoint("TOPLEFT")
-scrollChild:SetPoint("RIGHT")
-scrollChild:SetHeight(1)  -- Will be updated based on content
-scrollChild:SetClipsChildren(true)
-
--- Create content frame that will hold the pet list buttons
-local initialMissing = (BattlePetPlannerDB and type(BattlePetPlannerDB.missingPets) == "table" and BattlePetPlannerDB.missingPets) or {}
-local petListContent = CreateFrame("Frame", nil, scrollChild, "BackdropTemplate")
-petListContent:SetPoint("TOPLEFT")
-petListContent:SetPoint("RIGHT")
-petListContent:SetHeight(math.max(200, #initialMissing * PET_ROW_HEIGHT))
-
--- Store references for later use
-leftPane.petListContainer = petListContainer
-leftPane.scrollChild = scrollChild
-leftPane.petListContent = petListContent
-
--- Function to update content position and handle bounds
-local function UpdatePetListPosition(scrollValue)
-    -- Calculate max possible scroll value (number of rows that can be scrolled)
-    local contentHeight = petListContent:GetHeight() or 1
-    local containerHeight = petListContainer:GetHeight() or 1
-    local maxScroll = math.max(0, (contentHeight - containerHeight) / PET_ROW_HEIGHT)
-    
-    -- Clamp the scroll value to valid range
-    scrollValue = math.max(0, math.min(scrollValue, maxScroll))
-    
-    -- Calculate pixel offset (negative because we're moving the content up)
-    local offset = -scrollValue * PET_ROW_HEIGHT
-    
-    -- Update content position
-    petListContent:ClearAllPoints()
-    petListContent:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, offset)
-    petListContent:SetPoint("RIGHT", scrollChild, "RIGHT")
-    
-    -- Return the actual scroll value used (after clamping)
-    return scrollValue
-end
-
--- Store the function for later use
-leftPane.UpdatePetListPosition = UpdatePetListPosition
-
--- =====================
--- LEFT PANE: Minimal Scrollbar
--- =====================
-local function SetupLeftPaneScrollbar()
-    local BPP_MinimalScrollbar = _G.BPP_MinimalScrollbar
-    if not BPP_MinimalScrollbar or not BPP_MinimalScrollbar.Attach then
-        print("BattlePetPlanner: BPP_MinimalScrollbar not found, scrollbar will not work")
-        return
+        -- Content: The actual scrollable content (pet list items)
+        local content = CreateFrame("Frame", nil, scrollChild)
+        content:SetPoint("TOPLEFT")
+        content:SetWidth(scrollChild:GetWidth()) -- Will be updated dynamically
+        leftPane.petListContent = content
     end
-    
-    -- Create the scrollbar with options
-    local opts = {
-        width = SCROLLBAR_WIDTH,
-        skinnyWidth = 6,
-        arrowButtonHeight = 16,
-        padding = SCROLLBAR_PADDING,
-        buttonHeight = PET_ROW_HEIGHT,
-        -- Custom offsets for left pane scrollbar
-        upButtonOffsetX = -1,  -- Move 2px left from default -3 (to -1)
-        downButtonOffsetX = -1, -- Move 2px left from default -3 (to -1)
-    }
-    
-    -- Attach the scrollbar to the container
-    local scrollbar = BPP_MinimalScrollbar.Attach(
-        petListContainer,
-        petListContainer,
-        petListContent,
-        opts
-    )
-    
-    -- Store reference to the scrollbar
-    leftPane.scrollbar = scrollbar
-    
-    -- Helper to update scrollbar range and thumb
-    local function RefreshPetListScrollbar()
-        -- Get the current pet list
-        local allPets = BattlePetPlannerDB and BattlePetPlannerDB.allPets or {}
-        if type(allPets) ~= "table" then allPets = {} end
-        
-        -- Filter pets based on search text if needed
-        local displayPets = {}
-        local searchText = leftPane.searchBox and leftPane.searchBox:GetText():lower() or ""
-        
-        for _, pet in ipairs(allPets) do
-            if searchText == "" or (pet.name and pet.name:lower():find(searchText, 1, true)) then
-                table.insert(displayPets, pet)
-            end
-        end
-        
-        local numPets = #displayPets
-        local containerHeight = petListContainer:GetHeight() or 1
-        local contentHeight = numPets * PET_ROW_HEIGHT
-        
-        -- Update content height
-        petListContent:SetHeight(contentHeight)
-        scrollChild:SetHeight(math.max(containerHeight, contentHeight))
-        
-        -- Calculate maximum scroll value
-        local maxScroll = math.max(0, contentHeight - containerHeight)
-        
-        -- Update scrollbar range
-        scrollbar:SetMinMaxValues(0, maxScroll)
-        
-        -- Update scrollbar visibility and thumb size
-        if maxScroll > 0 then
-            scrollbar:Show()
-            
-            -- Update thumb size based on visible content ratio
-            local thumb = scrollbar.thumb
-            if thumb then
-                local thumbHeight = math.max(20, (containerHeight / contentHeight) * containerHeight)
-                thumb:SetHeight(thumbHeight)
-                
-                -- Force update of thumb position
-                local currentValue = scrollbar:GetValue()
-                if currentValue > maxScroll then
-                    scrollbar:SetValue(maxScroll)
+    local content = leftPane.petListContent
+    if not content.buttons then content.buttons = {} end
+
+    -- Minimal Scrollbar integration (attach only once)
+    if not leftPane.minimalScrollBar and leftPane.petListContainer and leftPane.scrollChild and leftPane.petListContent then
+        local BPP_MinimalScrollbar = _G.BPP_MinimalScrollbar
+        if BPP_MinimalScrollbar and BPP_MinimalScrollbar.Attach then
+            local opts = {
+                width = 8,
+                arrowButtonHeight = 16,
+                padding = 4,
+                totalNumItems = 0,
+                buttonHeight = 46,
+            }
+            local minimalScrollBar = BPP_MinimalScrollbar.Attach(
+                leftPane.petListContainer,
+                leftPane.scrollChild,
+                leftPane.petListContent,
+                opts
+            )
+            leftPane.minimalScrollBar = minimalScrollBar
+            minimalScrollBar:Show()
+
+            -- Helper to update range and thumb
+            local function RefreshPetListScrollbar()
+                local pets = BattlePetPlannerDB and BattlePetPlannerDB.allPets or {}
+                local numPets = #pets
+                minimalScrollBar.totalNumItems = numPets  -- Update the scrollbar's total items
+                local visibleRows = math.floor((leftPane.scrollChild:GetHeight() or 1) / 46)
+                local maxScroll = math.max(0, numPets - visibleRows)
+                minimalScrollBar:SetMinMaxValues(0, maxScroll)
+                if minimalScrollBar:GetValue() > maxScroll then
+                    minimalScrollBar:SetValue(maxScroll)
                 end
             end
-        else
-            scrollbar:SetValue(0)
-            scrollbar:Hide()
-        end
-    end
-    
-    -- Set up scrollbar value changed handler with bounds checking
-    local lastValue = 0
-    scrollbar:SetScript("OnValueChanged", function(self, value, isUserInput)
-        -- Only update if value actually changed
-        if math.abs(value - lastValue) < 0.1 then return end
-        lastValue = value
-        
-        -- Update the content position
-        local actualValue = UpdatePetListPosition(value)
-        
-        -- Ensure scrollbar reflects any clamping that occurred
-        if math.abs(actualValue - value) > 0.1 then
-            scrollbar:SetValue(actualValue)
-        end
-    end)
-    
-    -- Enable mouse wheel scrolling on the container
-    petListContainer:EnableMouseWheel(true)
-    petListContainer:SetScript("OnMouseWheel", function(self, delta)
-        local min, max = scrollbar:GetMinMaxValues()
-        local current = scrollbar:GetValue()
-        
-        -- Calculate new value with smoother scrolling (2 rows per tick)
-        -- Negative delta means scrolling down (content moves up)
-        local scrollStep = 2  -- Rows per scroll tick
-        local newVal = current - (delta * scrollStep)
-        
-        -- Clamp the value with bounds checking
-        newVal = math.max(min, math.min(newVal, max))
-        
-        -- Only update if value changed significantly
-        if math.abs(newVal - current) > 0.1 then
-            scrollbar:SetValue(newVal)
-        end
-        
-        -- Mark as handled to prevent event bubbling
-        return true
-    end)
-    
-    -- Debounce function to prevent rapid updates
-    local debounceTimer
-    local function DebouncedRefresh()
-        if debounceTimer then return end
-        debounceTimer = C_Timer.NewTimer(0.05, function()
+
+            leftPane.scrollChild:HookScript("OnShow", RefreshPetListScrollbar)
+            leftPane.scrollChild:HookScript("OnSizeChanged", RefreshPetListScrollbar)
+            leftPane.petListContent:HookScript("OnSizeChanged", RefreshPetListScrollbar)
+
+            -- Move content on scroll
+            minimalScrollBar:SetScript("OnValueChanged", function(self, value)
+                leftPane.petListContent:ClearAllPoints()
+                leftPane.petListContent:SetPoint("TOPLEFT", leftPane.scrollChild, "TOPLEFT", 0, value * 46)
+            end)
+            leftPane.petListContainer:EnableMouseWheel(true)
+            leftPane.petListContainer:SetScript("OnMouseWheel", function(self, delta)
+    local min, max = minimalScrollBar:GetMinMaxValues()
+    local newVal = minimalScrollBar:GetValue() - delta
+    if newVal < min then newVal = min end
+    if newVal > max then newVal = max end
+    minimalScrollBar:SetValue(newVal)
+end)
+            -- Initial update
             RefreshPetListScrollbar()
-            debounceTimer = nil
-        end)
+            minimalScrollBar:SetValue(0)
+        end
     end
-    
-    -- Hook up events for scrollbar updates with debounce
-    petListContent:SetScript("OnSizeChanged", DebouncedRefresh)
-    petListContainer:SetScript("OnSizeChanged", DebouncedRefresh)
-    
-    -- Update scrollbar when pet list changes
-    hooksecurefunc("BattlePetPlanner_UpdatePetListGUI", DebouncedRefresh)
-    
-    -- Initial update after a short delay to ensure frames are properly sized
-    C_Timer.After(0.1, function()
-        -- Force update container size and refresh
-        petListContainer:GetHeight()
-        RefreshPetListScrollbar()
-    end)
-    
-    -- Initial position update
-    UpdatePetListPosition(0)
-end
 
--- Initialize the scrollbar
-C_Timer.After(0, SetupLeftPaneScrollbar)
-
+    
 -- =====================
 -- RIGHT PANE: Route Steps / Planner
 -- =====================
@@ -997,7 +870,6 @@ ShowRouteLeg = function(idx)
         if BPP_MinimalScrollbar and BPP_MinimalScrollbar.Attach then
             local opts = {
                 width = 8,
-                skinnyWidth = 4,
                 arrowButtonHeight = 16,
                 padding = 4,
                 totalNumItems = #steps,
