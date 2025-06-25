@@ -103,44 +103,46 @@ function BPP_MinimalScrollbar.Attach(parent, scrollFrame, contentFrame, opts)
     minimalScrollBar:SetThumbTexture(thumbTexture)
 
     -- Thumb sizing logic
+    local lastThumbHeight = 0
     local function UpdateMinimalThumbSize()
         local frameHeight = scrollFrame:GetHeight() or 1
+        if frameHeight <= 1 then return end  -- Skip if frame height is invalid
+        
         local minThumb = 16
-        local maxThumb = frameHeight
         local contentHeight
+        
         if totalNumItems and buttonHeight then
             contentHeight = totalNumItems * buttonHeight
         else
             contentHeight = contentFrame:GetHeight() or 1
         end
+        
+        -- Only update if content height is valid
+        if contentHeight <= 0 then return end
+        
         local proportion = math.min(1, frameHeight / contentHeight)
         local thumbHeight = math.max(minThumb, math.floor(proportion * frameHeight))
         
-        -- Ensure textures are shown before setting size
-        thumbTexture:Show()
-        thumbTop:Show()
-        thumbBottom:Show()
+        -- Only update if thumb size actually changed
+        if thumbHeight == lastThumbHeight then return end
+        lastThumbHeight = thumbHeight
         
         -- Set thumb size and position
         thumbTexture:SetHeight(math.max(thumbHeight - 8, 8))
-        thumbTop:ClearAllPoints()
-        thumbTop:SetPoint("BOTTOM", thumbTexture, "TOP", 0, 0)
-        thumbBottom:ClearAllPoints()
-        thumbBottom:SetPoint("TOP", thumbTexture, "BOTTOM", 0, 0)
         
-        -- Update thumb position
-        minimalScrollBar:SetValue(minimalScrollBar:GetValue() or 0)
-        thumbBottom:SetPoint("BOTTOM", thumbTexture, "BOTTOM", 0, -4)
-        -- DEBUG: Always show the scrollbar for troubleshooting
-        minimalScrollBar:Show()
-        --[[
-        if contentHeight > frameHeight then
-            minimalScrollBar:Show()
-        else
-            minimalScrollBar:Hide()
+        -- Only update points if they've changed
+        if not thumbTop:GetPoint(1) then
+            thumbTop:SetPoint("BOTTOM", thumbTexture, "TOP", 0, 0)
+            thumbBottom:SetPoint("TOP", thumbTexture, "BOTTOM", 0, 0)
         end
-        --]]
-        -- Removed scrollFrame:GetVerticalScroll()/SetVerticalScroll() as this is not a ScrollFrame
+        
+        -- Only update visibility if needed
+        local shouldShow = contentHeight > frameHeight
+        if shouldShow ~= minimalScrollBar:IsShown() then
+            minimalScrollBar:SetShown(shouldShow)
+            if upButton then upButton:SetShown(shouldShow) end
+            if downButton then downButton:SetShown(shouldShow) end
+        end
     end
     scrollFrame:HookScript("OnShow", UpdateMinimalThumbSize)
     scrollFrame:HookScript("OnSizeChanged", UpdateMinimalThumbSize)
@@ -173,13 +175,23 @@ function BPP_MinimalScrollbar.Attach(parent, scrollFrame, contentFrame, opts)
         minimalScrollBar:SetValue(val)
     end)
 
+    -- Store last value to prevent unnecessary updates
+    local lastValue = 0
+    
     -- Update list on scrollbar value change
-    minimalScrollBar:SetScript("OnValueChanged", function(self)
-        if type(scrollFrame.UpdateList) == "function" then
-            scrollFrame:UpdateList()
-        elseif _G.UpdateList then
-            -- fallback: global UpdateList
-            _G.UpdateList(scrollFrame, contentFrame, scrollFrame.buttons or {}, minimalScrollBar)
+    minimalScrollBar:SetScript("OnValueChanged", function(self, value, isUserInput)
+        -- Only update if value actually changed and we're not in the middle of a drag
+        if math.abs((value or 0) - (lastValue or 0)) < 0.1 then return end
+        lastValue = value or 0
+        
+        -- Only update content if this is a user interaction or the first update
+        if isUserInput or lastValue == 0 then
+            if type(scrollFrame.UpdateList) == "function" then
+                scrollFrame:UpdateList()
+            elseif _G.UpdateList then
+                -- fallback: global UpdateList
+                _G.UpdateList(scrollFrame, contentFrame, scrollFrame.buttons or {}, minimalScrollBar)
+            end
         end
     end)
 

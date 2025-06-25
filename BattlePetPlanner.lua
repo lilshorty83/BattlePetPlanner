@@ -509,8 +509,8 @@ leftPane.bg = leftBg
 
 -- Constants for pet list
 local PET_ROW_HEIGHT = 46  -- Height of each pet row in pixels
-local SCROLLBAR_WIDTH = 10  -- Width of the scrollbar
-local SCROLLBAR_PADDING = 6  -- Padding around the scrollbar
+local SCROLLBAR_WIDTH = 8   -- Width of the scrollbar (matches right pane)
+local SCROLLBAR_PADDING = 4 -- Padding around the scrollbar (matches right pane)
 local PET_LIST_PADDING = 3  -- Padding around the pet list
 
 -- Create main container for the pet list
