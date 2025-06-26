@@ -602,12 +602,44 @@ local function SetupLeftPaneScrollbar()
         scrollbar.thumb:SetAlpha(1)
     end
     
-    -- Set up scrollbar value changed handler
+    -- Store the last offset to prevent redundant updates
+    local lastOffset = nil
+    
+    -- Function to update content position
+    local function UpdateContentPosition(value)
+        -- Calculate the offset in pixels
+        local offset = math.floor(value * PET_ROW_HEIGHT)
+        
+        -- Calculate max possible offset (content height - container height)
+        local contentHeight = petListContent:GetHeight() or 1
+        local containerHeight = petListContainer:GetHeight() or 1
+        local maxOffset = math.max(0, contentHeight - containerHeight)
+        
+        -- Clamp the offset to valid range
+        offset = math.max(0, math.min(offset, maxOffset))
+        
+        -- Only update if position actually changed
+        if lastOffset ~= offset then
+            lastOffset = offset
+            
+            -- Update content position efficiently (using positive offset like original)
+            petListContent:ClearAllPoints()
+            petListContent:SetPoint("TOPLEFT", 0, offset)
+            petListContent:SetPoint("TOPRIGHT", 0, offset)
+        end
+    end
+    
+    -- Set up scrollbar value changed handler with throttling
+    local lastUpdate = 0
     scrollbar:SetScript("OnValueChanged", function(self, value, isUserInput)
-        local offset = -math.floor(value * PET_ROW_HEIGHT)
-        petListContent:ClearAllPoints()
-        petListContent:SetPoint("TOPLEFT", 0, offset)
-        petListContent:SetPoint("TOPRIGHT", 0, offset)
+        -- Throttle updates during fast scrolling
+        local now = GetTime()
+        if isUserInput and (now - lastUpdate) < 0.016 then  -- ~60 FPS
+            return
+        end
+        lastUpdate = now
+        
+        UpdateContentPosition(value)
         
         -- Ensure thumb remains visible
         if self.thumb then
@@ -620,7 +652,12 @@ local function SetupLeftPaneScrollbar()
     C_Timer.After(0.1, function()
         if scrollbar and scrollbar:IsShown() then
             local value = scrollbar:GetValue()
-            scrollbar:SetValue(value) -- This will trigger OnValueChanged
+            UpdateContentPosition(value)
+            -- Make sure thumb is visible
+            if scrollbar.thumb then
+                scrollbar.thumb:Show()
+                scrollbar.thumb:SetAlpha(1)
+            end
         end
     end)
     
@@ -670,12 +707,9 @@ local function SetupLeftPaneScrollbar()
         end
     end
     
-    -- Set up scrollbar value changed handler
-    scrollbar:SetScript("OnValueChanged", function(self, value)
-        UpdatePetListPosition(value * PET_ROW_HEIGHT)
-    end)
+    -- Remove duplicate scrollbar handler - using the optimized one above
     
-    -- Enable mouse wheel scrolling on the container
+    -- Enable mouse wheel scrolling on the container with throttling
     petListContainer:EnableMouseWheel(true)
     petListContainer:SetScript("OnMouseWheel", function(self, delta)
         local min, max = scrollbar:GetMinMaxValues()
@@ -683,6 +717,15 @@ local function SetupLeftPaneScrollbar()
         if newVal < min then newVal = min end
         if newVal > max then newVal = max end
         scrollbar:SetValue(newVal)
+    end)
+    
+    -- Disable mouse wheel during drag to prevent conflicts
+    scrollbar:SetScript("OnDragStart", function()
+        petListContainer:EnableMouseWheel(false)
+    end)
+    
+    scrollbar:SetScript("OnDragStop", function()
+        petListContainer:EnableMouseWheel(true)
     end)
     
     -- Hook up events for scrollbar updates
