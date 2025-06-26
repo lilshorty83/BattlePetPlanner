@@ -509,8 +509,8 @@ leftPane.bg = leftBg
 
 -- Constants for pet list
 local PET_ROW_HEIGHT = 46  -- Height of each pet row in pixels
-local SCROLLBAR_WIDTH = 8   -- Width of the scrollbar (matches right pane)
-local SCROLLBAR_PADDING = 4 -- Padding around the scrollbar (matches right pane)
+local SCROLLBAR_WIDTH = 10  -- Width of the scrollbar
+local SCROLLBAR_PADDING = 6  -- Padding around the scrollbar
 local PET_LIST_PADDING = 3  -- Padding around the pet list
 
 -- Create main container for the pet list
@@ -593,15 +593,35 @@ local function SetupLeftPaneScrollbar()
         opts
     )
     
-    -- Store reference to the scrollbar
+    -- Store reference to the scrollbar and make it accessible
     leftPane.scrollbar = scrollbar
     
+    -- Store thumb reference for direct access
+    if scrollbar.thumb then
+        scrollbar.thumb:Show()
+        scrollbar.thumb:SetAlpha(1)
+    end
+    
     -- Set up scrollbar value changed handler
-    scrollbar:SetScript("OnValueChanged", function(self, value)
+    scrollbar:SetScript("OnValueChanged", function(self, value, isUserInput)
         local offset = -math.floor(value * PET_ROW_HEIGHT)
         petListContent:ClearAllPoints()
         petListContent:SetPoint("TOPLEFT", 0, offset)
         petListContent:SetPoint("TOPRIGHT", 0, offset)
+        
+        -- Ensure thumb remains visible
+        if self.thumb then
+            self.thumb:Show()
+            self.thumb:SetAlpha(1)
+        end
+    end)
+    
+    -- Force an initial update of the scrollbar state
+    C_Timer.After(0.1, function()
+        if scrollbar and scrollbar:IsShown() then
+            local value = scrollbar:GetValue()
+            scrollbar:SetValue(value) -- This will trigger OnValueChanged
+        end
     end)
     
     -- Helper to update scrollbar range and thumb
